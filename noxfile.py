@@ -28,10 +28,12 @@ def tests_impl(
     session_python_info = session.run(
         "python",
         "-c",
-        "import sys; print(sys.implementation.name, sys.version_info.releaselevel, getattr(sys, '_is_gil_enabled', lambda: True)())",
+        "import sys; print(sys.implementation.name, sys.version_info.releaselevel, getattr(sys, '_is_gil_enabled', lambda: True)(), sys.version_info.major, sys.version_info.minor)",
         silent=True,
     ).strip()  # type: ignore[union-attr] # mypy doesn't know that silent=True  will return a string
-    implementation_name, release_level, _is_gil_enabled = session_python_info.split(" ")
+    implementation_name, release_level, _is_gil_enabled, major, minor = (
+        session_python_info.split(" ")
+    )
     free_threading = _is_gil_enabled == "False"
 
     if extras is None:
@@ -66,6 +68,10 @@ def tests_impl(
     if implementation_name != "cpython" or release_level != "final" or free_threading:
         memray_supported = False
     elif sys.platform == "win32":
+        memray_supported = False
+    elif (int(major), int(minor)) >= (3, 15):
+        # Mirrors pyproject's pytest-memray marker (python_full_version < '3.15');
+        # needed now that 3.15 is final and no longer excluded by release_level.
         memray_supported = False
 
     # Environment variables being passed to the pytest run.
